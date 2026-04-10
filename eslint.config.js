@@ -37,7 +37,16 @@ module.exports = [
     }
   },
   {
-    files: ['src/**/*.{js,jsx}', 'test/**/*.{js,jsx}'],
+    files: ['playwright.config.js'],
+    languageOptions: {
+      sourceType: 'module',
+      globals: {
+        ...globals.node,
+      }
+    }
+  },
+  {
+    files: ['src/**/*.{js,jsx}', 'test/**/*.{js,jsx}', 'e2e-tests/**/*.{js,jsx}'],
     plugins: {
       react,
       jest
@@ -53,7 +62,8 @@ module.exports = [
       globals: {
         ...globals.browser,
         ...globals.es6,
-        ...globals.jest
+        ...globals.jest,
+        
       }
     },
     settings: {
