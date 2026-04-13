@@ -1,6 +1,4 @@
 name: Deployment pipeline
-env:
-  CONTAINS_SKIP_TOKEN: ${{ contains(join(github.event.commits.*.message, ''), '#skip') }}
 
 on:
   push:
@@ -11,7 +9,7 @@ on:
     types: [opened, synchronize]
 
 jobs:
-  simple_deployment_pipeline:
+  build_and_test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -28,12 +26,18 @@ jobs:
         run: npx playwright install --with-deps
       - name: Run Playwright tests
         run: npm run test:e2e
+      
+  deploy:
+    if: ${{ github.event_name == 'push' && !contains(join(github.event.commits.*.message, ''), '#skip') }}
+    needs: [build_and_test]
+    runs-on: ubuntu-latest
+    steps:
       - name: Trigger deployment
-        if: ${{ github.event_name == 'push' && env.CONTAINS_SKIP_TOKEN == 'false' }}
         run: curl ${{ secrets.RENDER_DEPLOY_HOOK }}
+
   tag_release:
     if: ${{ github.event_name == 'push' && !contains(join(github.event.commits.*.message, ''), '#skip') }}
-    needs: [simple_deployment_pipeline]
+    needs: [deploy]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -43,3 +47,40 @@ jobs:
          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
          DEFAULT_BUMP: patch
          TAG_PREFIX: v
+
+  notify_success:
+    if: ${{ success()}}
+    needs: [deploy]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          nodetail: true
+          color: 0x00FF87
+          title: "🚀 ${{ github.repository }} deployed!"
+          description: |
+            **Author:**  ${{github.actor}}
+            **Message:** ${{github.event.head_commit.message}}
+            [View run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+  notify_failure:
+    if: ${{ failure()}}
+    needs: [deploy]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          nodetail: true
+          title: "🤕 Build failed"
+          color: 0xFF006E
+          description: |
+            **Repository:** [${{ github.repository }}](${{ github.server_url }}/${{ github.repository }})
+            **Branch:** `${{ github.ref_name }}`
+            **Trigger:** ${{ github.event_name }} by [${{ github.actor }}](https://github.com/${{ github.actor }})
+            **Commit:**  `${{ github.sha }}`
+            **Message:** ${{ github.event.head_commit.message }}
+
+            [View Commit](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}) • [View Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          username: "CI bot"
