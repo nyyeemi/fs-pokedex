@@ -63,6 +63,7 @@ jobs:
             **Author:**  ${{github.actor}}
             **Message:** ${{github.event.head_commit.message}}
             [View run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          username: "CI bot"
 
   notify_failure:
     if: ${{ failure()}}
